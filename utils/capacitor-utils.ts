@@ -3,6 +3,30 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
 /**
+ * Helper function to ensure filesystem permissions are granted on native platforms.
+ */
+const ensureFileSystemPermissions = async (): Promise<boolean> => {
+  if (!Capacitor.isNativePlatform()) {
+    return true;
+  }
+
+  try {
+    const status = await Filesystem.checkPermissions();
+    // 'publicStorage' is the specific permission key for Android external storage in Capacitor
+    if (status.publicStorage !== 'granted') {
+      const request = await Filesystem.requestPermissions();
+      return request.publicStorage === 'granted';
+    }
+    return true;
+  } catch (error) {
+    console.warn('Error checking filesystem permissions:', error);
+    // On some OS versions or configurations, checking might fail but writing might still work 
+    // (e.g. Scoped Storage). We return false to be safe, or handle specific error codes.
+    return false;
+  }
+};
+
+/**
  * Generic file saver that uses Capacitor Filesystem on native and browser download on web.
  * @param fileName The name of the file to save.
  * @param data The string content of the file.
@@ -12,8 +36,15 @@ import { Share } from '@capacitor/share';
 const saveFile = async (fileName: string, data: string, mimeType: string, savedMessage: string): Promise<void> => {
   try {
     if (Capacitor.isNativePlatform()) {
-      // Native: Use Capacitor Filesystem to save in the Documents directory.
-      // requestPermissions is deprecated; writeFile will trigger OS-level prompts if needed.
+      // Native: Check permissions before attempting to write
+      const hasPermission = await ensureFileSystemPermissions();
+      
+      if (!hasPermission) {
+        alert('Storage permission is required to save files to your device.');
+        return;
+      }
+
+      // Use Capacitor Filesystem to save in the Documents directory.
       await Filesystem.writeFile({
         path: fileName,
         data: data,
@@ -92,6 +123,7 @@ export const shareBackupData = async (fileName: string, data: string, title: str
     try {
         if (Capacitor.isNativePlatform()) {
             // Native: Save the file to the cache directory first, then share its URI.
+            // Writing to Cache usually doesn't require explicit storage permissions on modern Android.
             const result = await Filesystem.writeFile({
                 path: fileName,
                 data: data,
@@ -102,7 +134,7 @@ export const shareBackupData = async (fileName: string, data: string, title: str
             await Share.share({
                 title: title,
                 text: `Backup data for Aysha's P&L.`,
-                files: [result.uri], // Correctly use the 'files' array for local files
+                files: [result.uri], 
             });
         } else {
             // Web: Use the Web Share API with a File object for better compatibility.
@@ -152,7 +184,7 @@ export const shareImageFile = async (fileName: string, base64Data: string, title
             await Share.share({
                 title: title,
                 text: text,
-                files: [result.uri], // Correctly use the 'files' array for local files
+                files: [result.uri],
                 dialogTitle: 'Share Report'
             });
         } else {
