@@ -59,7 +59,7 @@ const BackupRestore: React.FC<BackupRestoreProps> = ({ allRecords, customStructu
     };
     const jsonString = JSON.stringify(backupData, null, 2);
     const fileName = `ayshas-backup-${new Date().toISOString().split('T')[0]}.json`;
-    await shareBackupData(fileName, jsonString, "Aysha's P&L Backup");
+    await shareBackupData(fileName, jsonString, "Ayshas Finance Tracker Backup");
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {

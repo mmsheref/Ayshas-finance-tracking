@@ -20,7 +20,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onFinish }) => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-950 text-white font-sans flex flex-col justify-between p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
             <div className="text-center animate-fadeInUp">
-                <h1 className="text-4xl font-bold mb-2">Welcome to Aysha's P&L</h1>
+                <h1 className="text-4xl font-bold mb-2">Welcome to Ayshas Finance Tracker</h1>
                 <p className="text-lg text-slate-400">Your simple daily profit & loss tracker.</p>
             </div>
             

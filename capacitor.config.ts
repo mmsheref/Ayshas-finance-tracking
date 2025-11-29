@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.aysha.pnltracker',
-  appName: "Aysha's P&L",
+  appName: 'Ayshas Finance Tracker',
   webDir: 'dist',
   server: {
     androidScheme: 'https'

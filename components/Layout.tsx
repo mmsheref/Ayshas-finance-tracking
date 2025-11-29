@@ -16,7 +16,7 @@ const Layout: React.FC = () => {
         if (path === '/records') return 'History';
         if (path === '/settings') return 'Settings';
         if (path === '/reports') return 'Analytics';
-        return "Aysha's P&L";
+        return "Ayshas Finance Tracker";
     };
 
     const isFormPage = location.pathname.includes('/new') || location.pathname.includes('/edit');
