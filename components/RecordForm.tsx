@@ -93,6 +93,7 @@ const RecordForm: React.FC = () => {
   const [expenseSearchTerm, setExpenseSearchTerm] = useState('');
   const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const footerRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
 
   const isSearching = expenseSearchTerm.trim().length > 0;
 
@@ -113,7 +114,8 @@ const RecordForm: React.FC = () => {
         setFormData({
           id: today, date: today, totalSales: 0, morningSales: 0, expenses: newExpenses, isClosed: false
         });
-        setOpenCategory(localStorage.getItem('ayshas-last-open-category') || newExpenses[0]?.name || null);
+        // Don't auto-open category on mount to keep UI clean initially
+        setOpenCategory(null);
       }
     };
     initializeForm();
@@ -255,11 +257,7 @@ const RecordForm: React.FC = () => {
     setNewCategoryName('');
 
     setTimeout(() => {
-      setOpenCategory(trimmedName);
-      const newCategoryRef = categoryRefs.current[trimmedName];
-      if (newCategoryRef) {
-          newCategoryRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      toggleCategory(trimmedName);
     }, 100);
   };
 
@@ -281,11 +279,40 @@ const RecordForm: React.FC = () => {
     navigate(`/records/${formData.id}`);
   };
 
+  const scrollToCategory = (categoryName: string) => {
+      // Small delay to allow the accordion animation to start/layout to update
+      setTimeout(() => {
+          const element = categoryRefs.current[categoryName];
+          if (!element) return;
+
+          // Calculate where the element should be.
+          // App Header is 64px.
+          // Sticky Search Header is approx 110px.
+          // We want the category header to sit just below the sticky search header.
+          const stickyOffset = (stickyHeaderRef.current?.offsetHeight || 110) + 64; 
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.scrollY - stickyOffset - 10; // 10px buffer
+
+          window.scrollTo({
+              top: offsetPosition,
+              behavior: "smooth"
+          });
+      }, 300);
+  };
+
   const toggleCategory = (categoryName: string) => {
-    const newOpenCategory = openCategory !== categoryName ? categoryName : null;
+    if (isSearching) return;
+    const isOpening = openCategory !== categoryName;
+    const newOpenCategory = isOpening ? categoryName : null;
+    
     setOpenCategory(newOpenCategory);
-    if (newOpenCategory) localStorage.setItem('ayshas-last-open-category', newOpenCategory);
-    else localStorage.removeItem('ayshas-last-open-category');
+    
+    if (isOpening) {
+        scrollToCategory(categoryName);
+        localStorage.setItem('ayshas-last-open-category', categoryName);
+    } else {
+        localStorage.removeItem('ayshas-last-open-category');
+    }
   };
 
   const handleGoToNextCategory = (currentCatIndex: number) => {
@@ -293,36 +320,7 @@ const RecordForm: React.FC = () => {
     const nextCategory = formData.expenses[currentCatIndex + 1];
     if (nextCategory) {
         toggleCategory(nextCategory.name);
-        setTimeout(() => {
-            const nextCategoryRef = categoryRefs.current[nextCategory.name];
-            if (nextCategoryRef) {
-                nextCategoryRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }, 300);
     }
-  };
-  
-  const scrollInputIntoView = (inputElement: HTMLInputElement) => {
-    if (!inputElement) return;
-    requestAnimationFrame(() => {
-        const footer = footerRef.current;
-        const header = document.querySelector('header');
-        if (!footer || !header) return;
-        const footerHeight = footer.offsetHeight;
-        const headerHeight = header.offsetHeight;
-        const inputRect = inputElement.getBoundingClientRect();
-        const PADDING = 20; 
-        let scrollAdjustment = 0;
-        if (inputRect.bottom > (window.innerHeight - footerHeight)) {
-            scrollAdjustment = inputRect.bottom - (window.innerHeight - footerHeight) + PADDING;
-        } 
-        else if (inputRect.top < headerHeight) {
-            scrollAdjustment = inputRect.top - headerHeight - PADDING;
-        }
-        if (scrollAdjustment !== 0) {
-            window.scrollBy({ top: scrollAdjustment, behavior: 'smooth' });
-        }
-    });
   };
 
   return (
@@ -375,20 +373,23 @@ const RecordForm: React.FC = () => {
 
       {/* Expenses Section */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-            <h3 className="text-lg font-medium text-surface-on dark:text-surface-on-dark">Expenses</h3>
-            <div className="text-sm font-bold text-error dark:text-error-dark">Total: ₹{totalExpenses.toLocaleString('en-IN')}</div>
-        </div>
-        
-        <div className="relative">
-            <input
-                type="text"
-                placeholder="Find expense..."
-                value={expenseSearchTerm}
-                onChange={(e) => setExpenseSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-surface-container-high dark:bg-surface-dark-container-high rounded-full border-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant dark:placeholder-surface-on-variant-dark"
-            />
-            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark" />
+        {/* Sticky Header Wrapper */}
+        <div ref={stickyHeaderRef} className="sticky top-[64px] z-20 bg-surface dark:bg-surface-dark pt-2 pb-3 -mx-4 px-4 shadow-sm transition-colors">
+            <div className="flex items-center justify-between px-1 mb-2">
+                <h3 className="text-lg font-medium text-surface-on dark:text-surface-on-dark">Expenses</h3>
+                <div className="text-sm font-bold text-error dark:text-error-dark">Total: ₹{totalExpenses.toLocaleString('en-IN')}</div>
+            </div>
+            
+            <div className="relative">
+                <input
+                    type="text"
+                    placeholder="Find expense..."
+                    value={expenseSearchTerm}
+                    onChange={(e) => setExpenseSearchTerm(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-surface-container-high dark:bg-surface-dark-container-high rounded-full border-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-dark text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant dark:placeholder-surface-on-variant-dark"
+                />
+                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark" />
+            </div>
         </div>
 
         {filteredExpenses.map((category) => {
@@ -401,11 +402,11 @@ const RecordForm: React.FC = () => {
             <div 
                 key={category.id} 
                 ref={el => { if (el) categoryRefs.current[category.name] = el }} 
-                className={`rounded-[20px] overflow-hidden transition-all duration-300 border border-surface-outline/10 dark:border-surface-outline-dark/10 ${isOpen ? 'bg-surface-container dark:bg-surface-dark-container shadow-sm' : 'bg-surface-container dark:bg-surface-dark-container'}`}
+                className={`rounded-[20px] overflow-hidden transition-all duration-300 border border-surface-outline/10 dark:border-surface-outline-dark/10 ${isOpen ? 'bg-surface-container dark:bg-surface-dark-container shadow-sm ring-1 ring-primary/20 dark:ring-primary-dark/20' : 'bg-surface-container dark:bg-surface-dark-container'}`}
             >
               <button type="button" onClick={() => toggleCategory(category.name)} className="w-full flex justify-between items-center p-4 text-left active:bg-surface-container-high dark:active:bg-surface-dark-container-high" aria-expanded={isOpen} disabled={isSearching}>
                 <div className="flex flex-col">
-                  <span className="text-base font-medium text-surface-on dark:text-surface-on-dark">{category.name}</span>
+                  <span className={`text-base font-medium ${isOpen ? 'text-primary dark:text-primary-dark' : 'text-surface-on dark:text-surface-on-dark'}`}>{category.name}</span>
                   <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-0.5">₹{categoryTotal.toLocaleString('en-IN')}</span>
                 </div>
                 <ChevronDownIcon className={`w-6 h-6 text-surface-on-variant dark:text-surface-on-variant-dark transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
@@ -416,7 +417,7 @@ const RecordForm: React.FC = () => {
                     <div className="h-px w-full bg-surface-outline/10 dark:bg-surface-outline-dark/10 mb-4"></div>
                     
                     {/* SCROLLABLE ITEM LIST */}
-                    <div className="space-y-6 max-h-[50vh] overflow-y-auto no-scrollbar pr-1 -mr-1">
+                    <div className="space-y-6">
                         {category.items.map((item) => {
                         const itemIndex = item.originalIndex;
                         return (
@@ -449,8 +450,8 @@ const RecordForm: React.FC = () => {
                         )})}
                     </div>
                     
-                    {/* ACTION BUTTONS (fixed at bottom) */}
-                    <div className="flex gap-2 pt-4 border-t border-surface-outline/5 dark:border-surface-outline-dark/5 mt-4">
+                    {/* ACTION BUTTONS (fixed at bottom of category) */}
+                    <div className="flex gap-2 pt-6 mt-4">
                         <button 
                             type="button" 
                             onClick={() => { setNewItem({ name: '', categoryIndex: catIndex, saveForFuture: false, defaultValue: 0 }); setAddItemModalOpen(true); }} 
