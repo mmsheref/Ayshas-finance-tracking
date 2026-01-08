@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { CustomExpenseStructure } from '../types';
-import { PencilSquareIcon, TrashIcon, CheckIcon, XMarkIcon, PlusIcon, ChevronDownIcon, WarningIcon, DownloadIcon, UploadIcon } from './Icons';
+import { PencilSquareIcon, TrashIcon, CheckIcon, XMarkIcon, PlusIcon, ChevronDownIcon, WarningIcon, DownloadIcon, UploadIcon, CameraIcon } from './Icons';
 import Modal from './Modal';
 import { saveStructureFile } from '../utils/capacitor-utils';
 import { isCustomStructure } from '../utils/validation-utils';
@@ -9,6 +9,8 @@ import { isCustomStructure } from '../utils/validation-utils';
 interface ExpenseStructureManagerProps {
     structure: CustomExpenseStructure;
     onUpdate: (newStructure: CustomExpenseStructure) => void;
+    billUploadCategories: string[];
+    onUpdateBillFlags: (newCategories: string[]) => void;
 }
 
 type DeleteType = 'category' | 'item';
@@ -19,13 +21,14 @@ interface DeleteConfirmationState {
     itemName?: string;
 }
 
-const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ structure, onUpdate }) => {
+const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ structure, onUpdate, billUploadCategories, onUpdateBillFlags }) => {
     const [internalStructure, setInternalStructure] = useState(structure);
     const [isDirty, setIsDirty] = useState(false);
     const [openCategories, setOpenCategories] = useState<string[]>([]);
     const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
     const [showAddItemModal, setShowAddItemModal] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryNeedsBill, setNewCategoryNeedsBill] = useState(false);
     const [newItem, setNewItem] = useState({ name: '', defaultValue: 0 });
     const [targetCategory, setTargetCategory] = useState('');
     const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmationState | null>(null);
@@ -74,9 +77,15 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
             return;
         }
         setInternalStructure(prev => ({ ...prev, [trimmedName]: [] }));
+        
+        if (newCategoryNeedsBill) {
+            onUpdateBillFlags([...billUploadCategories, trimmedName]);
+        }
+
         setIsDirty(true);
         setShowAddCategoryModal(false);
         setNewCategoryName('');
+        setNewCategoryNeedsBill(false);
     };
     
     const handleAddItem = () => {
@@ -108,6 +117,10 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
                 delete newStructure[catName];
                 return newStructure;
             });
+            // Clean up bill setting
+            if (billUploadCategories.includes(catName)) {
+                onUpdateBillFlags(billUploadCategories.filter(c => c !== catName));
+            }
         } else if (type === 'item' && itemName) {
             setInternalStructure(prev => {
                 const newStructure = { ...prev };
@@ -117,6 +130,14 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
         }
         setIsDirty(true);
         setDeleteConfirmation(null);
+    };
+
+    const toggleBillRequirement = (catName: string) => {
+        if (billUploadCategories.includes(catName)) {
+            onUpdateBillFlags(billUploadCategories.filter(c => c !== catName));
+        } else {
+            onUpdateBillFlags([...billUploadCategories, catName]);
+        }
     };
 
     const handleExport = async () => {
@@ -197,14 +218,25 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
                 />
             </div>
 
-            {sortedCategories.map(catName => (
+            {sortedCategories.map(catName => {
+                const needsBill = billUploadCategories.includes(catName);
+                return (
                 <div key={catName} className="bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
-                    <div className="flex items-center p-3">
+                    <div className="flex items-center p-3 gap-2">
                         <button onClick={() => toggleCategory(catName)} className="flex-grow flex items-center text-left">
                             <ChevronDownIcon className={`w-5 h-5 mr-2 text-surface-on-variant dark:text-surface-on-variant-dark transform transition-transform ${openCategories.includes(catName) ? 'rotate-180' : ''}`} />
                             <span className="font-semibold text-primary dark:text-primary-dark">{catName}</span>
                         </button>
-                        <button onClick={() => setDeleteConfirmation({ type: 'category', catName })} className="p-1 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark" aria-label="Delete category">
+                        
+                        <button 
+                            onClick={() => toggleBillRequirement(catName)} 
+                            className={`p-2 rounded-full transition-colors ${needsBill ? 'bg-primary/20 text-primary dark:text-primary-dark' : 'text-surface-outline dark:text-surface-outline-dark hover:bg-surface-variant/10'}`}
+                            title={needsBill ? "Bill upload enabled" : "Enable bill upload"}
+                        >
+                            <CameraIcon className="w-5 h-5"/>
+                        </button>
+
+                        <button onClick={() => setDeleteConfirmation({ type: 'category', catName })} className="p-2 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark rounded-full hover:bg-surface-variant/10" aria-label="Delete category">
                             <TrashIcon className="w-5 h-5"/>
                         </button>
                     </div>
@@ -236,7 +268,7 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
                         </div>
                     )}
                 </div>
-            ))}
+            )})}
             <button onClick={() => setShowAddCategoryModal(true)} className="w-full text-sm font-semibold flex items-center justify-center p-2.5 rounded-xl border-2 border-dashed border-primary/50 dark:border-primary-dark/50 text-primary dark:text-primary-dark hover:bg-primary-container/10 dark:hover:bg-primary-container-dark/10 transition-colors">
                 <PlusIcon className="w-5 h-5 mr-2"/> Add New Category
             </button>
@@ -254,6 +286,20 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
                     <div className="p-4 bg-surface-container dark:bg-surface-dark-container rounded-[24px]">
                         <h3 className="text-xl font-bold mb-4 text-surface-on dark:text-surface-on-dark">Add New Category</h3>
                         <input type="text" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="e.g., Beverages" className={inputStyles} />
+                        
+                        <label className="flex items-center space-x-3 mt-4 p-2 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={newCategoryNeedsBill} 
+                                onChange={(e) => setNewCategoryNeedsBill(e.target.checked)} 
+                                className="w-5 h-5 text-primary dark:text-primary-dark border-surface-outline rounded focus:ring-primary dark:focus:ring-primary-dark bg-transparent"
+                            />
+                            <div className="flex flex-col">
+                                <span className="text-sm font-medium text-surface-on dark:text-surface-on-dark">Needs Bill Proof?</span>
+                                <span className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark">Show camera button for items in this category.</span>
+                            </div>
+                        </label>
+
                         <div className="mt-6 flex justify-end space-x-3">
                             <button onClick={() => setShowAddCategoryModal(false)} className="px-4 py-2 border border-surface-outline/30 dark:border-surface-outline-dark/30 rounded-full text-surface-on dark:text-surface-on-dark hover:bg-surface-variant/10">Cancel</button>
                             <button onClick={handleAddCategory} className="px-4 py-2 bg-secondary dark:bg-secondary-dark text-white dark:text-secondary-on-dark rounded-full hover:bg-secondary/90">Add</button>

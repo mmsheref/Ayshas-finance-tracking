@@ -192,7 +192,15 @@ const ReportCardManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
 };
 
 const SettingsPage: React.FC = () => {
-    const { records, customStructure, activeYear, handleRestore, handleUpdateStructure } = useAppContext();
+    const { 
+        records, 
+        customStructure, 
+        activeYear, 
+        billUploadCategories, 
+        handleRestore, 
+        handleUpdateStructure, 
+        handleUpdateBillUploadCategories 
+    } = useAppContext();
     const navigate = useNavigate();
     const [isStructureModalOpen, setStructureModalOpen] = useState(false);
     const [isFoodCostModalOpen, setFoodCostModalOpen] = useState(false);
@@ -203,6 +211,10 @@ const SettingsPage: React.FC = () => {
     const onStructureUpdate = async (newStructure: CustomExpenseStructure) => {
         await handleUpdateStructure(newStructure);
         alert("Expense structure updated successfully!");
+    };
+
+    const onBillCategoriesUpdate = async (newCategories: string[]) => {
+        await handleUpdateBillUploadCategories(newCategories);
     };
 
     return (
@@ -247,7 +259,12 @@ const SettingsPage: React.FC = () => {
                             </button>
                         </div>
                         <div className="flex-grow p-4 overflow-y-auto">
-                           <ExpenseStructureManager structure={customStructure} onUpdate={onStructureUpdate} />
+                           <ExpenseStructureManager 
+                                structure={customStructure} 
+                                onUpdate={onStructureUpdate} 
+                                billUploadCategories={billUploadCategories}
+                                onUpdateBillFlags={onBillCategoriesUpdate}
+                           />
                         </div>
                     </div>
                 </Modal>

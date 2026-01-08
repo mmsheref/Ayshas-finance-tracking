@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { DailyRecord } from '../types';
-import { generateNewRecordExpenses, CATEGORIES_WITH_BILL_UPLOAD } from '../constants';
+import { generateNewRecordExpenses } from '../constants';
 import { useAppContext } from '../context/AppContext';
 import ImageUpload from './ImageUpload';
 import Modal from './Modal';
@@ -15,7 +15,7 @@ interface OutlinedInputProps extends React.InputHTMLAttributes<HTMLInputElement>
     parentBg?: string;
 }
 
-// Material Outlined Input Component
+// Material Outlined Input Component (Used for Sales Inputs)
 const OutlinedInput: React.FC<OutlinedInputProps> = ({ 
     label, 
     id, 
@@ -77,7 +77,8 @@ const RecordForm: React.FC = () => {
     handleSave, 
     customStructure, 
     handleSaveCustomItem,
-    records: allRecords
+    records: allRecords,
+    billUploadCategories
   } = useAppContext();
   
   const isEditing = !!recordId;
@@ -414,35 +415,51 @@ const RecordForm: React.FC = () => {
               
               <div className={`transition-[max-height] duration-500 ease-in-out overflow-hidden ${isOpen ? 'max-h-[3000px]' : 'max-h-0'}`}>
                 <div className="px-4 pb-4">
-                    <div className="h-px w-full bg-surface-outline/10 dark:bg-surface-outline-dark/10 mb-4"></div>
+                    <div className="h-px w-full bg-surface-outline/10 dark:bg-surface-outline-dark/10 mb-2"></div>
                     
                     {/* SCROLLABLE ITEM LIST */}
-                    <div className="space-y-6">
+                    <div className="space-y-0">
                         {category.items.map((item) => {
                         const itemIndex = item.originalIndex;
                         return (
-                        <div key={item.id} className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <label htmlFor={`${category.id}-${item.id}`} className="text-sm font-medium text-surface-on dark:text-surface-on-dark">{item.name}</label>
-                                <button type="button" onClick={() => setDeleteConfirmation({catIndex, itemIndex, itemName: item.name})} className="p-2 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark active:bg-error-container/20 rounded-full" aria-label={`Remove ${item.name}`}>
-                                    <TrashIcon className="w-4 h-4"/>
-                                </button>
+                        <div key={item.id} className="group flex items-center gap-3 py-3 border-b border-surface-outline/5 dark:border-surface-outline-dark/5 last:border-0">
+                            
+                            {/* Name & Delete - Left Side */}
+                            <div className="flex-grow min-w-0 mr-1">
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor={`${category.id}-${item.id}`} className="text-sm font-medium text-surface-on dark:text-surface-on-dark cursor-pointer select-none">
+                                        {item.name}
+                                    </label>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setDeleteConfirmation({catIndex, itemIndex, itemName: item.name})} 
+                                        className="p-1.5 text-surface-on-variant/50 hover:text-error dark:hover:text-error-dark transition-colors rounded-full" 
+                                        aria-label={`Remove ${item.name}`}
+                                    >
+                                        <TrashIcon className="w-4 h-4"/>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex gap-3 items-end">
-                                <div className="flex-grow">
-                                    <OutlinedInput 
+
+                            {/* Controls - Right Side */}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                
+                                {/* Minimal Input */}
+                                <div className="relative w-28">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-on-variant dark:text-surface-on-variant-dark text-sm pointer-events-none">₹</span>
+                                    <input 
                                         id={`${category.id}-${item.id}`}
                                         value={item.amount === 0 ? '' : item.amount}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleExpenseChange(catIndex, itemIndex, e.target.value)}
+                                        onChange={(e) => handleExpenseChange(catIndex, itemIndex, e.target.value)}
                                         type="number"
                                         inputMode="decimal"
-                                        prefix
-                                        label="Amount"
-                                        data-expense-input="true"
-                                        parentBg="bg-surface-container dark:bg-surface-dark-container" // Keep standard for now
+                                        placeholder="0"
+                                        className="w-full h-10 pl-6 pr-3 bg-surface-container-highest/50 dark:bg-surface-dark-container-highest/50 focus:bg-surface-container-highest dark:focus:bg-surface-dark-container-highest rounded-xl text-right text-base font-semibold text-surface-on dark:text-surface-on-dark placeholder-surface-on-variant/50 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                                     />
                                 </div>
-                                {CATEGORIES_WITH_BILL_UPLOAD.includes(category.name) && (
+
+                                {/* Camera Button */}
+                                {billUploadCategories.includes(category.name) && (
                                     <ImageUpload billPhotos={item.billPhotos} onPhotosChange={(photos) => handlePhotosChange(catIndex, itemIndex, photos)} />
                                 )}
                             </div>
