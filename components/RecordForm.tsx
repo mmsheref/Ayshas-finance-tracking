@@ -9,14 +9,32 @@ import ImageUpload from './ImageUpload';
 import Modal from './Modal';
 import { PlusIcon, TrashIcon, ChevronDownIcon, WarningIcon, SearchIcon, ChevronRightIcon } from './Icons';
 
-// Material Outlined Input Component - Moved OUTSIDE to prevent focus loss bugs
-const OutlinedInput = ({ label, id, value, onChange, type = "text", inputMode = "text", placeholder = "", prefix, parentBg = "bg-surface-container", ...props }: any) => {
+interface OutlinedInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+    label: string;
+    prefix?: boolean;
+    parentBg?: string;
+}
+
+// Material Outlined Input Component
+const OutlinedInput: React.FC<OutlinedInputProps> = ({ 
+    label, 
+    id, 
+    value, 
+    onChange, 
+    type = "text", 
+    inputMode = "text", 
+    placeholder = "", 
+    prefix, 
+    parentBg = "bg-surface-container", 
+    className,
+    ...props 
+}) => {
     const labelBgClass = parentBg === "bg-surface-container" 
       ? "bg-surface-container dark:bg-surface-dark-container" 
       : parentBg;
 
     return (
-    <div className="relative group">
+    <div className={`relative group ${className || ''}`}>
         <input
             type={type}
             id={id}
@@ -57,7 +75,6 @@ const RecordForm: React.FC = () => {
   const { 
     getRecordById, 
     handleSave, 
-    sortedRecords, 
     customStructure, 
     handleSaveCustomItem,
     records: allRecords
@@ -76,6 +93,8 @@ const RecordForm: React.FC = () => {
   const [expenseSearchTerm, setExpenseSearchTerm] = useState('');
   const categoryRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const footerRef = useRef<HTMLDivElement>(null);
+
+  const isSearching = expenseSearchTerm.trim().length > 0;
 
   useEffect(() => {
     const initializeForm = () => {
@@ -119,7 +138,7 @@ const RecordForm: React.FC = () => {
   
   const profit = useMemo(() => {
     if (!formData) return 0;
-    if (formData.isClosed) return -totalExpenses; // If closed, profit is just negative expenses
+    if (formData.isClosed) return -totalExpenses; 
     return (formData.totalSales || 0) - totalExpenses;
   }, [formData?.totalSales, totalExpenses, formData?.isClosed]);
 
@@ -178,8 +197,6 @@ const RecordForm: React.FC = () => {
         return {
             ...prev,
             isClosed: checked,
-            // Optional: Clear sales if marked as closed? Or just visually hide them.
-            // Let's set them to 0 to ensure consistency.
             totalSales: checked ? 0 : prev.totalSales,
             morningSales: checked ? 0 : prev.morningSales
         };
@@ -308,26 +325,6 @@ const RecordForm: React.FC = () => {
     });
   };
 
-  const handleExpenseKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter' && e.keyCode !== 13) return;
-    e.preventDefault();
-    const allVisibleInputs = Array.from(
-      document.querySelectorAll<HTMLInputElement>('input[data-expense-input="true"]')
-    );
-    const currentInput = e.target as HTMLInputElement;
-    const currentIndex = allVisibleInputs.findIndex(input => input.id === currentInput.id);
-    if (currentIndex > -1 && currentIndex < allVisibleInputs.length - 1) {
-      const nextInput = allVisibleInputs[currentIndex + 1];
-      nextInput.focus();
-      nextInput.select();
-      scrollInputIntoView(nextInput);
-    } else {
-      currentInput.blur();
-    }
-  };
-
-  const isSearching = expenseSearchTerm.trim().length > 0;
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pb-44">
       {/* Primary Info Section */}
@@ -435,7 +432,7 @@ const RecordForm: React.FC = () => {
                                     <OutlinedInput 
                                         id={`${category.id}-${item.id}`}
                                         value={item.amount === 0 ? '' : item.amount}
-                                        onChange={(e: any) => handleExpenseChange(catIndex, itemIndex, e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleExpenseChange(catIndex, itemIndex, e.target.value)}
                                         type="number"
                                         inputMode="decimal"
                                         prefix
@@ -518,7 +515,7 @@ const RecordForm: React.FC = () => {
             <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
                 <h3 className="text-xl font-medium mb-6 text-surface-on dark:text-surface-on-dark">New Expense Item</h3>
                 <div className="space-y-4">
-                    <OutlinedInput id="newItemName" label="Item Name" value={newItem.name} onChange={(e: any) => setNewItem({...newItem, name: e.target.value})} parentBg="bg-surface-container dark:bg-surface-dark-container" />
+                    <OutlinedInput id="newItemName" label="Item Name" value={newItem.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewItem({...newItem, name: e.target.value})} parentBg="bg-surface-container dark:bg-surface-dark-container" />
                     
                     <label className="flex items-center space-x-3 p-2 cursor-pointer">
                         <input type="checkbox" checked={newItem.saveForFuture} onChange={(e) => setNewItem({...newItem, saveForFuture: e.target.checked})} className="w-5 h-5 text-primary dark:text-primary-dark border-surface-outline rounded focus:ring-primary dark:focus:ring-primary-dark bg-transparent"/>
@@ -526,7 +523,7 @@ const RecordForm: React.FC = () => {
                     </label>
 
                     {newItem.saveForFuture && (
-                       <OutlinedInput id="defaultValue" label="Default Amount" type="number" value={newItem.defaultValue === 0 ? '' : newItem.defaultValue} onChange={(e: any) => setNewItem({...newItem, defaultValue: parseFloat(e.target.value) || 0})} prefix parentBg="bg-surface-container dark:bg-surface-dark-container" />
+                       <OutlinedInput id="defaultValue" label="Default Amount" type="number" value={newItem.defaultValue === 0 ? '' : newItem.defaultValue} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewItem({...newItem, defaultValue: parseFloat(e.target.value) || 0})} prefix parentBg="bg-surface-container dark:bg-surface-dark-container" />
                     )}
                 </div>
                 <div className="mt-8 flex justify-end gap-2">
@@ -541,7 +538,7 @@ const RecordForm: React.FC = () => {
         <Modal onClose={() => setAddCategoryModalOpen(false)}>
             <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
                 <h3 className="text-xl font-medium mb-6 text-surface-on dark:text-surface-on-dark">New Category</h3>
-                <OutlinedInput id="newCategoryName" label="Category Name" value={newCategoryName} onChange={(e: any) => setNewCategoryName(e.target.value)} parentBg="bg-surface-container dark:bg-surface-dark-container" />
+                <OutlinedInput id="newCategoryName" label="Category Name" value={newCategoryName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCategoryName(e.target.value)} parentBg="bg-surface-container dark:bg-surface-dark-container" />
                 <div className="mt-8 flex justify-end gap-2">
                     <button type="button" onClick={() => setAddCategoryModalOpen(false)} className="px-4 py-2 text-primary dark:text-primary-dark font-medium hover:bg-primary-container/30 dark:hover:bg-primary-container-dark/30 rounded-full">Cancel</button>
                     <button type="button" onClick={handleAddNewCategory} className="px-6 py-2 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-full font-medium">Add</button>

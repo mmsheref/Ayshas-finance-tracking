@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { CustomExpenseStructure } from '../types';
 import { PencilSquareIcon, TrashIcon, CheckIcon, XMarkIcon, PlusIcon, ChevronDownIcon, WarningIcon, DownloadIcon, UploadIcon } from './Icons';
@@ -10,6 +11,14 @@ interface ExpenseStructureManagerProps {
     onUpdate: (newStructure: CustomExpenseStructure) => void;
 }
 
+type DeleteType = 'category' | 'item';
+
+interface DeleteConfirmationState {
+    type: DeleteType;
+    catName: string;
+    itemName?: string;
+}
+
 const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ structure, onUpdate }) => {
     const [internalStructure, setInternalStructure] = useState(structure);
     const [isDirty, setIsDirty] = useState(false);
@@ -19,7 +28,7 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
     const [newCategoryName, setNewCategoryName] = useState('');
     const [newItem, setNewItem] = useState({ name: '', defaultValue: 0 });
     const [targetCategory, setTargetCategory] = useState('');
-    const [deleteConfirmation, setDeleteConfirmation] = useState<any>(null);
+    const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmationState | null>(null);
     const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
     const [structureToImport, setStructureToImport] = useState<CustomExpenseStructure | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,7 +108,7 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
                 delete newStructure[catName];
                 return newStructure;
             });
-        } else if (type === 'item') {
+        } else if (type === 'item' && itemName) {
             setInternalStructure(prev => {
                 const newStructure = { ...prev };
                 newStructure[catName] = newStructure[catName].filter(item => item.name !== itemName);
