@@ -8,9 +8,8 @@ import { isCustomStructure } from '../utils/validation-utils';
 
 interface ExpenseStructureManagerProps {
     structure: CustomExpenseStructure;
-    onUpdate: (newStructure: CustomExpenseStructure) => void;
-    billUploadCategories: string[];
-    onUpdateBillFlags: (newCategories: string[]) => void;
+    onSave: (newStructure: CustomExpenseStructure, newBillFlags: string[]) => void;
+    initialBillUploadCategories: string[];
 }
 
 type DeleteType = 'category' | 'item';
@@ -21,9 +20,11 @@ interface DeleteConfirmationState {
     itemName?: string;
 }
 
-const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ structure, onUpdate, billUploadCategories, onUpdateBillFlags }) => {
+const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ structure, onSave, initialBillUploadCategories }) => {
     const [internalStructure, setInternalStructure] = useState(structure);
+    const [internalBillFlags, setInternalBillFlags] = useState<string[]>(initialBillUploadCategories);
     const [isDirty, setIsDirty] = useState(false);
+    
     const [openCategories, setOpenCategories] = useState<string[]>([]);
     const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
     const [showAddItemModal, setShowAddItemModal] = useState(false);
@@ -38,16 +39,18 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
 
     useEffect(() => {
         setInternalStructure(structure);
+        setInternalBillFlags(initialBillUploadCategories);
         setIsDirty(false);
-    }, [structure]);
+    }, [structure, initialBillUploadCategories]);
 
     const handleSaveChanges = () => {
-        onUpdate(internalStructure);
+        onSave(internalStructure, internalBillFlags);
         setIsDirty(false);
     };
 
     const handleDiscardChanges = () => {
         setInternalStructure(structure);
+        setInternalBillFlags(initialBillUploadCategories);
         setIsDirty(false);
     };
     
@@ -79,7 +82,7 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
         setInternalStructure(prev => ({ ...prev, [trimmedName]: [] }));
         
         if (newCategoryNeedsBill) {
-            onUpdateBillFlags([...billUploadCategories, trimmedName]);
+            setInternalBillFlags(prev => [...prev, trimmedName]);
         }
 
         setIsDirty(true);
@@ -118,8 +121,8 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
                 return newStructure;
             });
             // Clean up bill setting
-            if (billUploadCategories.includes(catName)) {
-                onUpdateBillFlags(billUploadCategories.filter(c => c !== catName));
+            if (internalBillFlags.includes(catName)) {
+                setInternalBillFlags(prev => prev.filter(c => c !== catName));
             }
         } else if (type === 'item' && itemName) {
             setInternalStructure(prev => {
@@ -133,11 +136,12 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
     };
 
     const toggleBillRequirement = (catName: string) => {
-        if (billUploadCategories.includes(catName)) {
-            onUpdateBillFlags(billUploadCategories.filter(c => c !== catName));
+        if (internalBillFlags.includes(catName)) {
+            setInternalBillFlags(prev => prev.filter(c => c !== catName));
         } else {
-            onUpdateBillFlags([...billUploadCategories, catName]);
+            setInternalBillFlags(prev => [...prev, catName]);
         }
+        setIsDirty(true);
     };
 
     const handleExport = async () => {
@@ -219,7 +223,7 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
             </div>
 
             {sortedCategories.map(catName => {
-                const needsBill = billUploadCategories.includes(catName);
+                const needsBill = internalBillFlags.includes(catName);
                 return (
                 <div key={catName} className="bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
                     <div className="flex items-center p-3 gap-2">

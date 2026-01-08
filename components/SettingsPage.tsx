@@ -208,13 +208,10 @@ const SettingsPage: React.FC = () => {
     const [isAboutModalOpen, setAboutModalOpen] = useState(false);
     const [isYearModalOpen, setYearModalOpen] = useState(false);
 
-    const onStructureUpdate = async (newStructure: CustomExpenseStructure) => {
+    const handleStructureSave = async (newStructure: CustomExpenseStructure, newBillFlags: string[]) => {
         await handleUpdateStructure(newStructure);
-        alert("Expense structure updated successfully!");
-    };
-
-    const onBillCategoriesUpdate = async (newCategories: string[]) => {
-        await handleUpdateBillUploadCategories(newCategories);
+        await handleUpdateBillUploadCategories(newBillFlags);
+        alert("Settings saved successfully!");
     };
 
     return (
@@ -261,9 +258,8 @@ const SettingsPage: React.FC = () => {
                         <div className="flex-grow p-4 overflow-y-auto">
                            <ExpenseStructureManager 
                                 structure={customStructure} 
-                                onUpdate={onStructureUpdate} 
-                                billUploadCategories={billUploadCategories}
-                                onUpdateBillFlags={onBillCategoriesUpdate}
+                                onSave={handleStructureSave} 
+                                initialBillUploadCategories={billUploadCategories}
                            />
                         </div>
                     </div>
