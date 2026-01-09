@@ -5,7 +5,7 @@ import ExpenseProfitChart from './ExpenseProfitChart';
 import SalesChart from './SalesChart';
 import { useAppContext } from '../context/AppContext';
 import { calculateTotalExpenses, getTodayDateString, subtractDays, getThisWeekRange, getThisMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
-import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon } from './Icons';
+import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon, ClockIcon } from './Icons';
 
 type ChartFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
@@ -19,7 +19,7 @@ const FilterPill: React.FC<{ label: string, value: ChartFilter, active: boolean,
 );
 
 const Dashboard: React.FC = () => {
-  const { sortedRecords: records, activeYear } = useAppContext();
+  const { sortedRecords: records, allSortedRecords, activeYear, trackedItems } = useAppContext();
   const navigate = useNavigate();
   const [chartFilter, setChartFilter] = useState<ChartFilter>('WEEK');
 
@@ -143,6 +143,49 @@ const Dashboard: React.FC = () => {
     });
   }, [records, chartFilter]);
 
+  // 6. Tracked Items Data
+  const trackedItemsData = useMemo(() => {
+    if (!trackedItems || trackedItems.length === 0) return [];
+    
+    return trackedItems.map(itemName => {
+        // Find most recent record containing this item with amount > 0
+        const latestRecord = allSortedRecords.find(record => {
+            return record.expenses.some(cat => 
+                cat.items.some(item => item.name === itemName && item.amount > 0)
+            );
+        });
+
+        if (!latestRecord) return { name: itemName, daysAgo: null, date: null, amount: 0 };
+
+        const purchaseDate = new Date(latestRecord.date + 'T00:00:00');
+        const today = new Date(todayStr + 'T00:00:00');
+        const diffTime = Math.abs(today.getTime() - purchaseDate.getTime());
+        const daysAgo = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+        // Find exact amount in that record
+        let amount = 0;
+        latestRecord.expenses.forEach(cat => {
+            const item = cat.items.find(i => i.name === itemName);
+            if (item) amount = item.amount;
+        });
+
+        return {
+            name: itemName,
+            daysAgo,
+            date: latestRecord.date,
+            amount
+        };
+    }).sort((a, b) => {
+        // Sort by days ago (asc) so recent purchases are first? Or oldest?
+        // Let's sort by most recent purchase first (smallest daysAgo)
+        if (a.daysAgo === null && b.daysAgo === null) return 0;
+        if (a.daysAgo === null) return 1;
+        if (b.daysAgo === null) return -1;
+        return a.daysAgo - b.daysAgo;
+    });
+
+  }, [trackedItems, allSortedRecords, todayStr]);
+
 
   // --- EMPTY STATE ---
   if (records.length === 0) {
@@ -177,6 +220,35 @@ const Dashboard: React.FC = () => {
                 </p>
             </div>
         </div>
+
+        {/* SECTION 0: INVENTORY WATCH (If Configured) */}
+        {trackedItemsData.length > 0 && (
+            <div>
+                 <div className="flex items-center gap-2 mb-3 px-1">
+                    <ClockIcon className="w-5 h-5 text-surface-on-variant dark:text-surface-on-variant-dark"/>
+                    <h3 className="text-base font-medium text-surface-on dark:text-surface-on-dark">Inventory Watch</h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {trackedItemsData.map((item) => (
+                        <div key={item.name} className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] flex flex-col justify-between">
+                            <p className="text-xs font-bold uppercase tracking-wider text-surface-on-variant dark:text-surface-on-variant-dark truncate mb-2">{item.name}</p>
+                            {item.daysAgo !== null ? (
+                                <div>
+                                    <p className="text-xl font-bold text-surface-on dark:text-surface-on-dark leading-none mb-1">
+                                        {item.daysAgo === 0 ? 'Today' : (item.daysAgo === 1 ? 'Yesterday' : `${item.daysAgo} Days`)}
+                                    </p>
+                                    <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">
+                                        {new Date(item.date!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} • ₹{item.amount.toLocaleString('en-IN')}
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-surface-on-variant/50 dark:text-surface-on-variant-dark/50 italic">Not purchased yet</p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
 
         {/* SECTION 1: THE PULSE (YESTERDAY) */}
         {yesterdayStats ? (
