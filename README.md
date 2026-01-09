@@ -6,7 +6,7 @@ A comprehensive, mobile-first P&L dashboard designed for restaurant owners to tr
 
 **Android Users**: Get the latest APK from the **Releases** section on GitHub.
 
-1.  Go to the [**Releases**](../../releases) page of this repository.
+1.  Go to the [**Releases**](https://github.com/mmsheref/AyshasFinanceMyreactApp/releases) page.
 2.  Find the latest version (e.g., `v2.4.0`).
 3.  Click on **Assets** and download the `.apk` file.
 4.  Install it on your Android device.
