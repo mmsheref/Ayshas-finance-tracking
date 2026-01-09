@@ -151,29 +151,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const activeYearRecords = useMemo(() => {
         if (activeYear === 'all') return records;
         
-        // Fiscal Year Logic (April to March)
-        // e.g., '2023-2024' includes April 2023 to March 2024
-        const [startYearStr, endYearStr] = activeYear.split('-');
-        const startYear = parseInt(startYearStr);
-        const endYear = parseInt(endYearStr);
-        
-        const startDate = `${startYear}-04-01`;
-        const endDate = `${endYear}-03-31`;
-
-        return records.filter(r => r.date >= startDate && r.date <= endDate);
+        // Calendar Year Logic (Jan 1 to Dec 31)
+        // Date format YYYY-MM-DD starts with YYYY
+        return records.filter(r => r.date.startsWith(activeYear));
     }, [records, activeYear]);
 
     const availableYears = useMemo(() => {
         if (records.length === 0) return [];
         const years = new Set<string>();
         records.forEach(r => {
-            const date = new Date(r.date);
-            const month = date.getMonth(); // 0-11
-            const year = date.getFullYear();
-            // If month is Jan-Mar (0-2), it belongs to previous fiscal year started in (year-1)
-            // If month is Apr-Dec (3-11), it belongs to fiscal year started in (year)
-            const fiscalStartYear = month < 3 ? year - 1 : year;
-            years.add(`${fiscalStartYear}-${fiscalStartYear + 1}`);
+            // Extract YYYY from YYYY-MM-DD
+            const year = r.date.substring(0, 4);
+            years.add(year);
         });
         return Array.from(years).sort().reverse();
     }, [records]);

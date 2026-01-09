@@ -109,7 +109,7 @@ const YearPicker: React.FC<{onClose: () => void}> = ({ onClose }) => {
     return (
         <Modal onClose={onClose}>
             <div className="bg-surface-container dark:bg-surface-dark-container rounded-[28px] p-6">
-                <h2 className="text-xl font-medium text-surface-on dark:text-surface-on-dark mb-4">Select Fiscal Year</h2>
+                <h2 className="text-xl font-medium text-surface-on dark:text-surface-on-dark mb-4">Select Year</h2>
                 <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                     <button 
                         onClick={() => handleSelect('all')}
@@ -125,7 +125,7 @@ const YearPicker: React.FC<{onClose: () => void}> = ({ onClose }) => {
                             className={`w-full text-left p-4 rounded-xl transition-colors ${activeYear === year ? 'bg-primary-container dark:bg-primary-container-dark text-primary-on-container dark:text-primary-on-container-dark' : 'bg-surface-container-high dark:bg-surface-dark-container-high text-surface-on dark:text-surface-on-dark'}`}
                         >
                             <p className="font-bold">{year}</p>
-                            <p className="text-xs opacity-70">Fiscal year {year}</p>
+                            <p className="text-xs opacity-70">Calendar Year {year}</p>
                         </button>
                     ))}
                 </div>
@@ -282,7 +282,7 @@ const SettingsPage: React.FC = () => {
     return (
         <div className="pb-10 pt-4">
             <SettingsGroup title="General">
-                <SettingsItem icon={<CalendarIcon className="w-5 h-5"/>} title="Reporting Period" description={activeYear === 'all' ? 'Showing all records' : `Active Fiscal Year: ${activeYear}`} onClick={() => setYearModalOpen(true)} />
+                <SettingsItem icon={<CalendarIcon className="w-5 h-5"/>} title="Reporting Period" description={activeYear === 'all' ? 'Showing all records' : `Year: ${activeYear}`} onClick={() => setYearModalOpen(true)} />
                 <SettingsItem icon={<PaintBrushIcon className="w-5 h-5"/>} title="Theme" description="Appearance">
                     <ThemeSwitcher />
                 </SettingsItem>

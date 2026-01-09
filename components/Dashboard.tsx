@@ -359,7 +359,7 @@ const Dashboard: React.FC = () => {
             <div>
                 <h1 className="text-3xl font-normal text-surface-on dark:text-surface-on-dark">Overview</h1>
                 <p className="text-surface-on-variant dark:text-surface-on-variant-dark text-sm">
-                    {activeYear === 'all' ? 'Business Dashboard' : `Fiscal Year ${activeYear}`}
+                    {activeYear === 'all' ? 'Business Dashboard' : `Year ${activeYear}`}
                 </p>
             </div>
         </div>
