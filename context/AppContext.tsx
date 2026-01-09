@@ -205,6 +205,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const totalSwapped = recentLogs.reduce((sum, l) => sum + l.count, 0);
             
             // Time window is from first recent log to today
+            // FIX: Ensure timeSpan is at least 1 day to avoid division by zero
             const firstRecentLogDate = new Date(recentLogs[recentLogs.length - 1].date);
             const timeSpan = Math.max(1, Math.floor((today.getTime() - firstRecentLogDate.getTime()) / (1000 * 60 * 60 * 24)));
             
@@ -314,11 +315,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const handleLogGasSwap = async (count: number) => {
-        const newStock = gasConfig.currentStock - count;
-        // Don't allow negative stock for UI cleanliness
-        const finalStock = Math.max(0, newStock);
+        // FIX: Prevent negative stock
+        const newStock = Math.max(0, gasConfig.currentStock - count);
         
-        const newConfig = { ...gasConfig, currentStock: finalStock };
+        const newConfig = { ...gasConfig, currentStock: newStock };
         await handleUpdateGasConfig(newConfig);
 
         const newLog: GasLog = {

@@ -194,10 +194,20 @@ const ReportCardManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
 
 const GasConfigManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
     const { gasConfig, handleUpdateGasConfig } = useAppContext();
-    const [localConfig, setLocalConfig] = useState<GasConfig>(gasConfig);
+    
+    // Use local string state to allow empty inputs during typing
+    const [totalCylinders, setTotalCylinders] = useState(String(gasConfig.totalCylinders ?? 0));
+    const [currentStock, setCurrentStock] = useState(String(gasConfig.currentStock ?? 0));
+    const [cylindersPerBank, setCylindersPerBank] = useState(String(gasConfig.cylindersPerBank ?? 0));
     
     const handleSave = async () => {
-        await handleUpdateGasConfig(localConfig);
+        // Parse back to integers on save, defaulting to 0 if empty/invalid
+        const newConfig: GasConfig = {
+            totalCylinders: parseInt(totalCylinders) || 0,
+            currentStock: parseInt(currentStock) || 0,
+            cylindersPerBank: parseInt(cylindersPerBank) || 0
+        };
+        await handleUpdateGasConfig(newConfig);
         onClose();
     };
 
@@ -213,9 +223,10 @@ const GasConfigManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
                         <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Total Cylinders Owned</label>
                         <input 
                             type="number" 
-                            value={localConfig.totalCylinders || 0} 
-                            onChange={(e) => setLocalConfig({...localConfig, totalCylinders: parseInt(e.target.value) || 0})}
+                            value={totalCylinders} 
+                            onChange={(e) => setTotalCylinders(e.target.value)}
                             className={inputStyles}
+                            placeholder="0"
                         />
                         <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">
                             Total cylinders you own (Active + Full + Empty).
@@ -226,9 +237,10 @@ const GasConfigManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
                         <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Current Stock (Full)</label>
                         <input 
                             type="number" 
-                            value={localConfig.currentStock} 
-                            onChange={(e) => setLocalConfig({...localConfig, currentStock: parseInt(e.target.value) || 0})}
+                            value={currentStock} 
+                            onChange={(e) => setCurrentStock(e.target.value)}
                             className={inputStyles}
+                            placeholder="0"
                         />
                         <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">Number of full cylinders currently in inventory.</p>
                     </div>
@@ -237,9 +249,10 @@ const GasConfigManager: React.FC<{onClose: () => void}> = ({ onClose }) => {
                         <label className="block text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark mb-1">Active Connections</label>
                         <input 
                             type="number" 
-                            value={localConfig.cylindersPerBank} 
-                            onChange={(e) => setLocalConfig({...localConfig, cylindersPerBank: parseInt(e.target.value) || 0})}
+                            value={cylindersPerBank} 
+                            onChange={(e) => setCylindersPerBank(e.target.value)}
                             className={inputStyles}
+                            placeholder="0"
                         />
                          <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mt-1">Number of cylinders connected to the stove (Active).</p>
                     </div>
@@ -305,7 +318,7 @@ const SettingsPage: React.FC = () => {
             </SettingsGroup>
 
             <SettingsGroup title="App Info">
-                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About" description="Version 2.3.0 • Credits" onClick={() => setAboutModalOpen(true)} />
+                <SettingsItem icon={<InformationCircleIcon className="w-5 h-5"/>} title="About" description="Version 2.4.0 • Credits" onClick={() => setAboutModalOpen(true)} />
             </SettingsGroup>
             
             {isStructureModalOpen && (
@@ -343,7 +356,7 @@ const SettingsPage: React.FC = () => {
                         
                         <h2 className="text-2xl font-bold text-surface-on dark:text-surface-on-dark mb-1">Ayshas Finance Tracker</h2>
                         <p className="text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark bg-surface-container-high dark:bg-surface-dark-container-high py-1 px-3 rounded-full inline-block mb-8">
-                            Version 2.3.0
+                            Version 2.4.0
                         </p>
 
                         <div className="space-y-6">
