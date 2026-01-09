@@ -120,8 +120,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
 
                 const storedGasLogs = await db.getGasLogs();
-                // Sort logs desc
-                setGasLogs(storedGasLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+                // Normalize legacy logs (missing type/count)
+                const normalizedLogs = storedGasLogs.map(log => ({
+                    ...log,
+                    type: log.type || 'USAGE', // Default old logs to Usage
+                    count: log.count !== undefined ? log.count : (log.cylindersSwapped || 0)
+                }));
+                
+                setGasLogs(normalizedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
             } catch (error) {
                 console.error("Failed to load data:", error);
@@ -177,9 +183,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     
     // Gas Stats Calculation
     const gasStats = useMemo(() => {
-        if (gasLogs.length === 0) return { avgDailyUsage: 0, daysSinceLastSwap: -1 };
+        // Only count 'USAGE' logs for consumption stats
+        const usageLogs = gasLogs.filter(l => l.type === 'USAGE');
+        
+        if (usageLogs.length === 0) return { avgDailyUsage: 0, daysSinceLastSwap: -1 };
 
-        const lastSwap = new Date(gasLogs[0].date);
+        const lastSwap = new Date(usageLogs[0].date);
         const today = new Date();
         const diffTime = Math.abs(today.getTime() - lastSwap.getTime());
         const daysSinceLastSwap = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
@@ -189,11 +198,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
         
-        const recentLogs = gasLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
+        const recentLogs = usageLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
         
         let avgDailyUsage = 0;
         if (recentLogs.length > 0) {
-            const totalSwapped = recentLogs.reduce((sum, l) => sum + l.cylindersSwapped, 0);
+            const totalSwapped = recentLogs.reduce((sum, l) => sum + l.count, 0);
             
             // Time window is from first recent log to today
             const firstRecentLogDate = new Date(recentLogs[recentLogs.length - 1].date);
@@ -244,8 +253,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Load Optional Legacy Data
         if (data.gasLogs) {
             await db.clearGasLogs();
-            await db.bulkAddGasLogs(data.gasLogs);
-            setGasLogs(data.gasLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            const normalizedLogs = data.gasLogs.map(log => ({
+                ...log,
+                type: log.type || 'USAGE', 
+                count: log.count !== undefined ? log.count : (log.cylindersSwapped || 0)
+            }));
+            await db.bulkAddGasLogs(normalizedLogs);
+            setGasLogs(normalizedLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         }
         if (data.gasConfig) {
             await db.saveSetting('gasConfig', data.gasConfig);
@@ -310,7 +324,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const newLog: GasLog = {
             id: uuidv4(),
             date: new Date().toISOString(),
-            cylindersSwapped: count
+            type: 'USAGE',
+            count: count
         };
         await db.saveGasLog(newLog);
         setGasLogs(prev => [newLog, ...prev]);
@@ -320,6 +335,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const newStock = gasConfig.currentStock + count;
         const newConfig = { ...gasConfig, currentStock: newStock };
         await handleUpdateGasConfig(newConfig);
+
+        const newLog: GasLog = {
+            id: uuidv4(),
+            date: new Date().toISOString(),
+            type: 'REFILL',
+            count: count
+        };
+        await db.saveGasLog(newLog);
+        setGasLogs(prev => [newLog, ...prev]);
     };
 
     return (
