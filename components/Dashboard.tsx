@@ -3,8 +3,8 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExpenseProfitChart from './ExpenseProfitChart';
 import { useAppContext } from '../context/AppContext';
-import { calculateTotalExpenses, getTodayDateString, subtractDays, formatIndianNumberCompact } from '../utils/record-utils';
-import { SparklesIcon, ClockIcon, FireIcon, ListIcon, ChevronRightIcon } from './Icons';
+import { calculateTotalExpenses, getTodayDateString, formatIndianNumberCompact, subtractDays } from '../utils/record-utils';
+import { SparklesIcon, ClockIcon, FireIcon, ListIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
 import GasManager from './GasManager';
 
 type ChartFilter = 'WEEK' | 'MONTH' | 'YEAR';
@@ -62,35 +62,52 @@ const Dashboard: React.FC = () => {
   // 1. Get Dates
   const todayStr = getTodayDateString();
 
-  // 2. Prepare Pulse Data
-  const pulseStats = useMemo(() => {
-    const displayRecord = records.find(r => r.date < todayStr);
-    if (!displayRecord) return null;
-
-    const expenses = calculateTotalExpenses(displayRecord);
-    const isYesterday = displayRecord.date === subtractDays(todayStr, 1);
-
-    let label = '';
-    if (isYesterday) label = 'Yesterday';
-    else label = new Date(displayRecord.date).toLocaleDateString('en-GB', { weekday: 'long' });
-
-    const profit = displayRecord.totalSales - expenses;
+  // 2. Prepare Pulse Data (Latest Record) & 7-Day Context
+  const stats = useMemo(() => {
+    if (allSortedRecords.length === 0) return null;
     
-    return {
-        label,
-        dateDisplay: new Date(displayRecord.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-        sales: displayRecord.totalSales,
-        expenses,
-        profit,
-        recordId: displayRecord.id,
-        isClosed: displayRecord.isClosed
-    };
-  }, [records, todayStr]);
+    // Latest Record (Pulse)
+    const latestRecord = allSortedRecords[0];
+    const latestExpenses = calculateTotalExpenses(latestRecord);
+    const latestProfit = latestRecord.totalSales - latestExpenses;
+    
+    // Label Logic
+    let label = '';
+    if (latestRecord.date === todayStr) label = 'Today';
+    else if (latestRecord.date === subtractDays(todayStr, 1)) label = 'Yesterday';
+    else label = new Date(latestRecord.date).toLocaleDateString('en-GB', { weekday: 'long' });
 
-  // 3. Prepare Chart Data
+    // 7-Day Average Calculation for comparison
+    const last7 = allSortedRecords.slice(0, 7);
+    const avgProfit = last7.reduce((sum, r) => sum + (r.totalSales - calculateTotalExpenses(r)), 0) / last7.length;
+    
+    // Comparison
+    const diff = latestProfit - avgProfit;
+    const isHigher = diff > 0;
+    const diffPercent = avgProfit !== 0 ? Math.abs((diff / avgProfit) * 100) : 0;
+
+    return {
+        latest: {
+            id: latestRecord.id,
+            label,
+            dateDisplay: new Date(latestRecord.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+            sales: latestRecord.totalSales,
+            expenses: latestExpenses,
+            profit: latestProfit,
+            isClosed: latestRecord.isClosed
+        },
+        comparison: {
+            avgProfit,
+            isHigher,
+            diffPercent: diffPercent > 100 ? 100 : diffPercent // Cap visually
+        }
+    };
+  }, [allSortedRecords, todayStr]);
+
+  // 3. Prepare Chart Data (Rolling History)
   const chartData = useMemo(() => {
     let data = [];
-    if (chartFilter === 'WEEK') data = allSortedRecords.slice(0, 7);
+    if (chartFilter === 'WEEK') data = allSortedRecords.slice(0, 7); // Last 7 entries
     else if (chartFilter === 'MONTH') data = allSortedRecords.slice(0, 30);
     else data = allSortedRecords.slice(0, 90);
 
@@ -123,6 +140,29 @@ const Dashboard: React.FC = () => {
       return alerts.sort((a, b) => b.daysAgo - a.daysAgo);
   }, [allSortedRecords, trackedItems, todayStr]);
 
+  // Styles based on profit/loss
+  const heroCardStyle = useMemo(() => {
+      if (!stats) return 'bg-surface-container dark:bg-surface-dark-container';
+      if (stats.latest.isClosed) return 'bg-surface-container dark:bg-surface-dark-container';
+      
+      const isProfit = stats.latest.profit >= 0;
+      
+      // Green Tint for Profit, Red Tint for Loss
+      if (isProfit) {
+          return 'bg-gradient-to-br from-success/15 to-surface-container dark:from-success/10 dark:to-surface-dark-container border border-success/10 dark:border-success/5';
+      } else {
+          return 'bg-gradient-to-br from-error/15 to-surface-container dark:from-error/10 dark:to-surface-dark-container border border-error/10 dark:border-error/5';
+      }
+  }, [stats]);
+
+  const textColorClass = stats && !stats.latest.isClosed
+    ? (stats.latest.profit >= 0 ? 'text-success dark:text-success-dark' : 'text-error dark:text-error-dark') 
+    : 'text-surface-on dark:text-surface-on-dark';
+
+  const iconBgClass = stats && !stats.latest.isClosed
+    ? (stats.latest.profit >= 0 ? 'bg-success/20 text-success dark:text-success-dark' : 'bg-error/20 text-error dark:text-error-dark')
+    : 'bg-surface/20 text-surface-on dark:text-surface-on-dark';
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -139,53 +179,58 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Hero Pulse Card */}
+      {/* Hero Pulse Card (Latest Record) */}
       <div 
-        onClick={() => pulseStats && navigate(`/records/${pulseStats.recordId}`)}
-        className={`relative overflow-hidden rounded-[32px] p-6 shadow-sm active:scale-[0.98] transition-transform cursor-pointer ${
-            !pulseStats 
-            ? 'bg-surface-container dark:bg-surface-dark-container' 
-            : pulseStats.profit >= 0 
-                ? 'bg-gradient-to-br from-primary-container to-surface-container dark:from-primary-container-dark dark:to-surface-dark-container' 
-                : 'bg-gradient-to-br from-error-container to-surface-container dark:from-error-container-dark dark:to-surface-dark-container'
-        }`}
+        onClick={() => stats && navigate(`/records/${stats.latest.id}`)}
+        className={`relative overflow-hidden rounded-[32px] p-6 shadow-sm active:scale-[0.98] transition-transform cursor-pointer ${heroCardStyle}`}
       >
-        {pulseStats ? (
+        {stats ? (
             <>
                 <div className="flex justify-between items-start mb-6">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs font-bold uppercase tracking-widest opacity-60 text-surface-on dark:text-surface-on-dark">
-                                {pulseStats.label}
+                                {stats.latest.label}
                             </span>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface/30 backdrop-blur-md text-surface-on dark:text-surface-on-dark">
-                                {pulseStats.dateDisplay}
+                                {stats.latest.dateDisplay}
                             </span>
                         </div>
-                        {pulseStats.isClosed ? (
-                            <span className="text-2xl font-bold opacity-80">Shop Closed</span>
+                        
+                        {stats.latest.isClosed ? (
+                            <span className="text-2xl font-bold opacity-80 block mt-2 text-surface-on dark:text-surface-on-dark">Shop Closed</span>
                         ) : (
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-bold tracking-tight text-surface-on dark:text-surface-on-dark">
-                                    {pulseStats.profit >= 0 ? '+' : '-'}₹{formatIndianNumberCompact(Math.abs(pulseStats.profit))}
+                            <div className="flex items-baseline gap-2">
+                                <span className={`text-4xl font-bold tracking-tight ${textColorClass}`}>
+                                    {stats.latest.profit >= 0 ? '+' : '-'}₹{formatIndianNumberCompact(Math.abs(stats.latest.profit))}
                                 </span>
                             </div>
                         )}
+                        
+                        {/* Comparison Pill */}
+                        {!stats.latest.isClosed && (
+                            <div className={`inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-lg text-[10px] font-bold backdrop-blur-sm ${
+                                stats.comparison.isHigher ? 'bg-success/20 text-success dark:text-success-dark' : 'bg-error/20 text-error dark:text-error-dark'
+                            }`}>
+                                {stats.comparison.isHigher ? <ArrowUpIcon className="w-3 h-3"/> : <ArrowDownIcon className="w-3 h-3"/>}
+                                <span>{Math.round(stats.comparison.diffPercent)}% vs 7d Avg</span>
+                            </div>
+                        )}
                     </div>
-                    <div className="p-3 bg-surface/20 rounded-full backdrop-blur-sm">
-                        <SparklesIcon className="w-6 h-6 text-surface-on dark:text-surface-on-dark" />
+                    <div className={`p-3 rounded-full backdrop-blur-sm ${iconBgClass}`}>
+                        <SparklesIcon className="w-6 h-6" />
                     </div>
                 </div>
 
-                {!pulseStats.isClosed && (
+                {!stats.latest.isClosed && (
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-surface-on/5 dark:border-surface-on-dark/5">
                         <div>
-                            <p className="text-[10px] font-bold uppercase opacity-60 mb-0.5">Sales</p>
-                            <p className="text-lg font-bold">₹{formatIndianNumberCompact(pulseStats.sales)}</p>
+                            <p className="text-[10px] font-bold uppercase opacity-60 mb-0.5 text-surface-on dark:text-surface-on-dark">Sales</p>
+                            <p className="text-lg font-bold text-surface-on dark:text-surface-on-dark">₹{formatIndianNumberCompact(stats.latest.sales)}</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-[10px] font-bold uppercase opacity-60 mb-0.5">Expenses</p>
-                            <p className="text-lg font-bold">₹{formatIndianNumberCompact(pulseStats.expenses)}</p>
+                            <p className="text-[10px] font-bold uppercase opacity-60 mb-0.5 text-surface-on dark:text-surface-on-dark">Expenses</p>
+                            <p className="text-lg font-bold text-surface-on dark:text-surface-on-dark">₹{formatIndianNumberCompact(stats.latest.expenses)}</p>
                         </div>
                     </div>
                 )}
