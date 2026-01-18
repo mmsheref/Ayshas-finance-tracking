@@ -112,6 +112,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
                 const storedVisibility = await db.getSetting('reportCardVisibility');
                 if (storedVisibility) setReportCardVisibility(storedVisibility);
+                
+                const storedActiveYear = await db.getSetting('activeYear');
+                if (storedActiveYear) setActiveYearInternal(storedActiveYear);
 
                 const storedGasConfig = await db.getSetting('gasConfig');
                 if (storedGasConfig) {
@@ -217,6 +220,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 
     const setActiveYear = async (year: string) => {
+        await db.saveSetting('activeYear', year);
         setActiveYearInternal(year);
     };
 
