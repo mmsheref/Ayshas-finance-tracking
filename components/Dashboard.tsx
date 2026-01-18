@@ -7,7 +7,7 @@ import { useAppContext } from '../context/AppContext';
 import { calculateTotalExpenses, getTodayDateString, subtractDays, getThisWeekRange, getThisMonthRange, formatIndianNumberCompact } from '../utils/record-utils';
 import { SparklesIcon, PlusIcon, CalendarIcon, ChartBarIcon, ClockIcon, FireIcon, ListIcon } from './Icons';
 import Modal from './Modal';
-import GasHistoryModal from './GasHistoryModal';
+import GasManager from './GasManager'; // Switched from legacy GasTrackerCard/Modal
 
 type ChartFilter = 'WEEK' | 'MONTH' | 'YEAR';
 
@@ -20,31 +20,19 @@ const FilterPill: React.FC<{ label: string, value: ChartFilter, active: boolean,
     </button>
 );
 
+// Updated Gas Card for Dashboard
 const GasTrackerCard: React.FC = () => {
-    const { gasConfig, gasStats, handleLogGasSwap, handleGasRefill } = useAppContext();
-    const [isActionModalOpen, setActionModalOpen] = useState(false);
-    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-    const [swapCount, setSwapCount] = useState<number>(1);
-    const [refillCount, setRefillCount] = useState<number>(gasConfig.cylindersPerBank || 2);
+    const { gasState } = useAppContext();
+    const [isManagerOpen, setManagerOpen] = useState(false);
 
-    // Calculate Empty Shells: Total - (Active + FullStock)
-    const emptyCylinders = Math.max(0, (gasConfig.totalCylinders || 0) - (gasConfig.cylindersPerBank || 0) - gasConfig.currentStock);
-
-    const onSwapConfirm = async () => {
-        await handleLogGasSwap(swapCount);
-        setActionModalOpen(false);
-    };
-
-    const onRefillConfirm = async () => {
-        await handleGasRefill(refillCount);
-        setActionModalOpen(false);
-    };
+    // Calculated derived state is now available directly from Context
+    const { currentStock, emptyCylinders, avgDailyUsage, daysSinceLastSwap } = gasState;
 
     return (
         <>
             <div 
                 className="bg-surface-container dark:bg-surface-dark-container p-4 rounded-[20px] active:scale-[0.99] transition-transform cursor-pointer col-span-2 sm:col-span-1"
-                onClick={() => setActionModalOpen(true)}
+                onClick={() => setManagerOpen(true)}
             >
                 <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-2">
@@ -54,9 +42,9 @@ const GasTrackerCard: React.FC = () => {
                 </div>
                 
                 <div className="flex gap-2">
-                     <div className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center ${gasConfig.currentStock <= 1 ? 'bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark' : 'bg-surface-container-high dark:bg-surface-dark-container-high'}`}>
+                     <div className={`flex-1 p-2 rounded-xl flex flex-col items-center justify-center ${currentStock <= 1 ? 'bg-error-container dark:bg-error-container-dark text-error-on-container dark:text-error-on-container-dark' : 'bg-surface-container-high dark:bg-surface-dark-container-high'}`}>
                         <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">Full</span>
-                        <span className="text-xl font-bold">{gasConfig.currentStock}</span>
+                        <span className="text-xl font-bold">{currentStock}</span>
                      </div>
                      <div className="flex-1 p-2 rounded-xl bg-surface-container-high dark:bg-surface-dark-container-high flex flex-col items-center justify-center text-surface-on dark:text-surface-on-dark">
                         <span className="text-[10px] uppercase font-bold tracking-wider opacity-70">Empty</span>
@@ -68,91 +56,18 @@ const GasTrackerCard: React.FC = () => {
                     <div>
                          <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark mb-0.5">Usage</p>
                          <p className="text-sm font-bold text-surface-on dark:text-surface-on-dark">
-                             {gasStats.avgDailyUsage > 0 ? `${gasStats.avgDailyUsage.toFixed(1)}` : '-'} <span className="text-[10px] font-normal opacity-70">Cyl/Day</span>
+                             {avgDailyUsage > 0 ? `${avgDailyUsage.toFixed(1)}` : '-'} <span className="text-[10px] font-normal opacity-70">Cyl/Day</span>
                          </p>
                     </div>
                      <div className="text-right">
                          <p className="text-[10px] text-surface-on-variant dark:text-surface-on-variant-dark">Last Change</p>
-                         <p className="text-xs font-medium text-surface-on dark:text-surface-on-dark">{gasStats.daysSinceLastSwap >= 0 ? `${gasStats.daysSinceLastSwap} days ago` : 'Never'}</p>
+                         <p className="text-xs font-medium text-surface-on dark:text-surface-on-dark">{daysSinceLastSwap >= 0 ? `${daysSinceLastSwap} days ago` : 'Never'}</p>
                     </div>
                 </div>
             </div>
 
-            {isActionModalOpen && (
-                <Modal onClose={() => setActionModalOpen(false)} size="alert">
-                    <div className="p-6 bg-surface-container dark:bg-surface-dark-container rounded-[28px]">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-surface-on dark:text-surface-on-dark">Gas Actions</h3>
-                            <button 
-                                onClick={() => { setActionModalOpen(false); setIsHistoryModalOpen(true); }} 
-                                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container-highest dark:bg-surface-dark-container-highest text-xs font-bold text-primary dark:text-primary-dark"
-                            >
-                                <ListIcon className="w-3.5 h-3.5" /> History
-                            </button>
-                        </div>
-                        
-                        <div className="space-y-6">
-                            {/* CONNECT ACTION (Was Kitchen) */}
-                            <div className="bg-tertiary-container dark:bg-tertiary-container-dark p-4 rounded-xl text-tertiary-on-container dark:text-tertiary-on-container-dark">
-                                <p className="font-bold text-base mb-2">Connect Fresh Cylinder</p>
-                                <p className="text-xs opacity-80 mb-3">
-                                    Gas finished? Use a full cylinder from stock.
-                                </p>
-                                <div className="flex items-center gap-3 mb-2">
-                                     <div className="flex items-center bg-white/40 dark:bg-black/20 rounded-lg overflow-hidden shrink-0">
-                                        <button 
-                                            onClick={() => setSwapCount(Math.max(1, swapCount - 1))} 
-                                            className="w-10 h-10 flex items-center justify-center font-bold hover:bg-white/20 active:bg-white/30 text-lg"
-                                        >-</button>
-                                        <div className="w-10 h-10 flex items-center justify-center font-bold text-lg border-x border-white/20">
-                                            {swapCount}
-                                        </div>
-                                        <button 
-                                            onClick={() => setSwapCount(swapCount + 1)} 
-                                            className="w-10 h-10 flex items-center justify-center font-bold hover:bg-white/20 active:bg-white/30 text-lg"
-                                        >+</button>
-                                    </div>
-                                    <button 
-                                        onClick={onSwapConfirm}
-                                        className="flex-grow h-10 bg-tertiary-on-container dark:bg-tertiary-on-container-dark text-tertiary-container dark:text-tertiary-container-dark rounded-lg font-bold text-sm shadow-sm hover:opacity-90"
-                                    >
-                                        Confirm Usage
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* REFILL ACTION (Was Agency) */}
-                             <div className="p-4 bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl">
-                                <p className="font-bold text-base text-surface-on dark:text-surface-on-dark mb-2">Refill Stock (Exchange)</p>
-                                <p className="text-xs text-surface-on-variant dark:text-surface-on-variant-dark mb-3">
-                                    Handover empty cylinders, receive full ones.
-                                </p>
-                                <div className="flex items-center gap-3">
-                                    <input 
-                                        type="number" 
-                                        value={refillCount}
-                                        onChange={(e) => setRefillCount(parseInt(e.target.value) || 0)}
-                                        className="w-16 h-10 p-2 text-center font-bold rounded-lg bg-surface dark:bg-surface-dark border border-surface-outline/20 dark:border-surface-outline-dark/20 text-surface-on dark:text-surface-on-dark"
-                                    />
-                                    <button 
-                                        onClick={onRefillConfirm}
-                                        className="flex-grow h-10 bg-primary dark:bg-primary-dark text-primary-on dark:text-primary-on-dark rounded-lg font-bold text-sm hover:opacity-90"
-                                    >
-                                        Confirm Exchange
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                         <div className="mt-6 flex justify-center">
-                            <button onClick={() => setActionModalOpen(false)} className="px-4 py-2 text-sm font-medium text-surface-on-variant dark:text-surface-on-variant-dark">Close</button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-
-            {isHistoryModalOpen && (
-                <GasHistoryModal onClose={() => setIsHistoryModalOpen(false)} />
+            {isManagerOpen && (
+                <GasManager onClose={() => setManagerOpen(false)} />
             )}
         </>
     );
