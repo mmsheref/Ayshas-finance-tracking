@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { CustomExpenseStructure } from '../types';
-import { PlusIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon, DragHandleIcon } from './Icons';
+import { PlusIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon, DragHandleIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
 
 interface ExpenseStructureManagerProps {
     structure: CustomExpenseStructure;
@@ -91,58 +91,74 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
         onSave(internalStructure, billFlags);
     };
 
+    // --- Reorder Helpers (Manual Arrows) ---
+    const moveCategory = (index: number, direction: 'up' | 'down') => {
+        const keys = Object.keys(internalStructure);
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= keys.length) return;
+
+        const newKeys = [...keys];
+        const [movedKey] = newKeys.splice(index, 1);
+        newKeys.splice(newIndex, 0, movedKey);
+
+        const newStruct: CustomExpenseStructure = {};
+        newKeys.forEach(k => newStruct[k] = internalStructure[k]);
+        setInternalStructure(newStruct);
+    };
+
+    const moveItem = (catName: string, index: number, direction: 'up' | 'down') => {
+        const items = [...internalStructure[catName]];
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= items.length) return;
+
+        const [movedItem] = items.splice(index, 1);
+        items.splice(newIndex, 0, movedItem);
+
+        setInternalStructure(prev => ({
+            ...prev,
+            [catName]: items
+        }));
+    };
+
     // --- DnD Handlers for Categories ---
     const handleDragStartCategory = (e: React.DragEvent, index: number, catName: string) => {
         setDragItem({ type: 'category', catName, index });
         e.dataTransfer.effectAllowed = 'move';
         
-        // Use the card as the drag image instead of just the handle
+        // Ghost Image
         const card = e.currentTarget.closest('[data-category-card]');
         if (card) {
             e.dataTransfer.setDragImage(card, 0, 0);
-            card.classList.add('opacity-50');
         }
     };
 
-    const handleDragEndCategory = (e: React.DragEvent) => {
-        // Cleanup visual opacity
-        const cards = document.querySelectorAll('[data-category-card]');
-        cards.forEach(c => c.classList.remove('opacity-50'));
-        
+    const handleDragEndCategory = () => {
         setDragItem(null);
         setDragOverInfo(null);
     };
 
     const handleDragOverCategory = (e: React.DragEvent, index: number) => {
         e.preventDefault(); 
-        e.stopPropagation();
-        
         if (dragItem?.type !== 'category') return;
-        
-        if (dragOverInfo?.type !== 'category' || dragOverInfo.index !== index) {
-            setDragOverInfo({ type: 'category', index });
-        }
+        setDragOverInfo({ type: 'category', index });
     };
 
     const handleDropCategory = (e: React.DragEvent, dropIndex: number) => {
         e.preventDefault();
-        e.stopPropagation();
         if (dragItem?.type !== 'category') return;
 
         const keys = Object.keys(internalStructure);
         const draggedKey = keys[dragItem.index];
         
-        // Reorder keys
         const newKeys = [...keys];
         newKeys.splice(dragItem.index, 1);
         newKeys.splice(dropIndex, 0, draggedKey);
         
-        // Reconstruct object in new order
         const newStruct: CustomExpenseStructure = {};
         newKeys.forEach(k => newStruct[k] = internalStructure[k]);
         
         setInternalStructure(newStruct);
-        handleDragEndCategory(e); // Ensure cleanup
+        handleDragEndCategory();
     };
 
     // --- DnD Handlers for Items ---
@@ -154,15 +170,11 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
         const row = e.currentTarget.closest('[data-item-row]');
         if (row) {
             e.dataTransfer.setDragImage(row, 0, 0);
-            row.classList.add('opacity-50');
         }
     };
 
     const handleDragEndItem = (e: React.DragEvent) => {
         e.stopPropagation();
-        const rows = document.querySelectorAll('[data-item-row]');
-        rows.forEach(r => r.classList.remove('opacity-50'));
-        
         setDragItem(null);
         setDragOverInfo(null);
     };
@@ -170,12 +182,8 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
     const handleDragOverItem = (e: React.DragEvent, catName: string, index: number) => {
         e.preventDefault();
         e.stopPropagation();
-        
         if (dragItem?.type !== 'item' || dragItem.catName !== catName) return;
-        
-        if (dragOverInfo?.type !== 'item' || dragOverInfo.index !== index || dragOverInfo.catName !== catName) {
-            setDragOverInfo({ type: 'item', index, catName });
-        }
+        setDragOverInfo({ type: 'item', index, catName });
     };
 
     const handleDropItem = (e: React.DragEvent, catName: string, dropIndex: number) => {
@@ -187,12 +195,11 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
         const [movedItem] = items.splice(dragItem.index, 1);
         items.splice(dropIndex, 0, movedItem);
 
-        setInternalStructure(prev => ({
-            ...prev,
-            [catName]: items
-        }));
+        setInternalStructure(prev => ({ ...prev, [catName]: items }));
         handleDragEndItem(e);
     };
+
+    const categoryKeys = Object.keys(internalStructure);
 
     return (
         <div className="space-y-6 pb-20">
@@ -216,121 +223,168 @@ const ExpenseStructureManager: React.FC<ExpenseStructureManagerProps> = ({ struc
 
             {/* Categories List */}
             <div className="space-y-3">
-                {Object.keys(internalStructure).map((catName, catIndex) => (
-                    <div 
-                        key={catName} 
-                        data-category-card
-                        onDragOver={(e) => handleDragOverCategory(e, catIndex)}
-                        onDrop={(e) => handleDropCategory(e, catIndex)}
-                        className={`bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl overflow-hidden border transition-all duration-200 ${
-                            dragOverInfo?.type === 'category' && dragOverInfo.index === catIndex 
-                            ? 'border-primary dark:border-primary-dark ring-2 ring-primary/20 dark:ring-primary-dark/20' 
-                            : 'border-surface-outline/5 dark:border-surface-outline-dark/5'
-                        }`}
-                    >
-                        <div className="flex items-center justify-between p-3 bg-surface-container-highest/30 dark:bg-surface-dark-container-highest/30">
-                            {/* Drag Handle - NOW THE DRAGGABLE ELEMENT */}
-                            <div 
-                                draggable
-                                onDragStart={(e) => handleDragStartCategory(e, catIndex, catName)}
-                                onDragEnd={handleDragEndCategory}
-                                className="mr-2 cursor-grab active:cursor-grabbing text-surface-on-variant/50 dark:text-surface-on-variant-dark/50 hover:text-surface-on dark:hover:text-surface-on-dark p-2 -ml-2"
-                            >
-                                <DragHandleIcon className="w-5 h-5" />
-                            </div>
+                {categoryKeys.map((catName, catIndex) => {
+                    const isCatDragging = dragItem?.type === 'category' && dragItem.index === catIndex;
+                    const isCatDragOver = dragOverInfo?.type === 'category' && dragOverInfo.index === catIndex;
 
-                            <button onClick={() => toggleCategory(catName)} className="flex items-center gap-2 font-bold text-surface-on dark:text-surface-on-dark text-sm flex-grow text-left">
-                                {openCategories.includes(catName) ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
-                                {catName} ({internalStructure[catName].length})
-                            </button>
-                            <button onClick={() => setDeleteConfirmation({ type: 'category', catName })} className="p-1.5 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark transition-colors">
-                                <TrashIcon className="w-4 h-4" />
-                            </button>
-                        </div>
+                    return (
+                        <div 
+                            key={catName} 
+                            data-category-card
+                            onDragOver={(e) => handleDragOverCategory(e, catIndex)}
+                            onDrop={(e) => handleDropCategory(e, catIndex)}
+                            className={`bg-surface-container-high dark:bg-surface-dark-container-high rounded-xl overflow-hidden border transition-all duration-200 ${
+                                isCatDragOver 
+                                ? 'border-primary dark:border-primary-dark ring-2 ring-primary/20 dark:ring-primary-dark/20 z-10 scale-[1.01]' 
+                                : 'border-surface-outline/5 dark:border-surface-outline-dark/5'
+                            } ${isCatDragging ? 'opacity-30' : ''}`}
+                        >
+                            <div className="flex items-center justify-between p-3 bg-surface-container-highest/30 dark:bg-surface-dark-container-highest/30">
+                                {/* Drag Handle */}
+                                <div 
+                                    draggable
+                                    onDragStart={(e) => handleDragStartCategory(e, catIndex, catName)}
+                                    onDragEnd={handleDragEndCategory}
+                                    className="mr-2 cursor-grab active:cursor-grabbing text-surface-on-variant/50 dark:text-surface-on-variant-dark/50 hover:text-surface-on dark:hover:text-surface-on-dark p-2 -ml-2"
+                                >
+                                    <DragHandleIcon className="w-5 h-5" />
+                                </div>
 
-                        {openCategories.includes(catName) && (
-                            <div className="px-3 pb-3 space-y-2">
-                                {/* Items List */}
-                                {internalStructure[catName].map((item, itemIndex) => (
-                                    <div 
-                                        key={item.name} 
-                                        data-item-row
-                                        onDragOver={(e) => handleDragOverItem(e, catName, itemIndex)}
-                                        onDrop={(e) => handleDropItem(e, catName, itemIndex)}
-                                        className={`grid grid-cols-[auto_1fr_auto] items-center p-2 gap-x-2 rounded bg-surface-container dark:bg-surface-dark-container transition-all ${
-                                            dragOverInfo?.type === 'item' && dragOverInfo.catName === catName && dragOverInfo.index === itemIndex
-                                            ? 'ring-2 ring-primary/30 dark:ring-primary-dark/30 scale-[0.98]'
-                                            : ''
-                                        }`}
-                                    >
-                                        {/* Drag Handle Item - NOW THE DRAGGABLE ELEMENT */}
-                                        <div 
-                                            draggable
-                                            onDragStart={(e) => handleDragStartItem(e, catName, itemIndex)}
-                                            onDragEnd={handleDragEndItem}
-                                            className="cursor-grab active:cursor-grabbing text-surface-on-variant/30 dark:text-surface-on-variant-dark/30 hover:text-surface-on dark:hover:text-surface-on-dark row-span-2 self-center p-1"
-                                        >
-                                            <DragHandleIcon className="w-4 h-4" />
-                                        </div>
+                                <button onClick={() => toggleCategory(catName)} className="flex items-center gap-2 font-bold text-surface-on dark:text-surface-on-dark text-sm flex-grow text-left">
+                                    {openCategories.includes(catName) ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                                    {catName} ({internalStructure[catName].length})
+                                </button>
 
-                                        <span className="text-surface-on dark:text-surface-on-dark font-medium break-words leading-tight">{item.name}</span>
-                                        <button onClick={() => setDeleteConfirmation({ type: 'item', catName, itemName: item.name })} className="p-1 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark" aria-label="Delete item">
-                                            <TrashIcon className="w-4 h-4"/>
-                                        </button>
-                                        <div className="relative col-span-2 col-start-2 mt-1">
-                                            <input 
-                                                type="number" 
-                                                placeholder="Default Amount"
-                                                value={item.defaultValue || ''}
-                                                onChange={(e) => {
-                                                    const val = parseFloat(e.target.value);
-                                                    setInternalStructure(prev => ({
-                                                        ...prev,
-                                                        [catName]: prev[catName].map(i => i.name === item.name ? { ...i, defaultValue: isNaN(val) ? 0 : val } : i)
-                                                    }));
-                                                }}
-                                                className="w-full text-xs p-1.5 bg-transparent border-b border-surface-outline/20 dark:border-surface-outline-dark/20 focus:border-primary dark:focus:border-primary-dark outline-none text-surface-on-variant dark:text-surface-on-variant-dark"
-                                            />
-                                            <span className="absolute right-0 top-1.5 text-[10px] text-surface-on-variant/50">Default</span>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {/* Add Item Input */}
-                                <div className="flex gap-2 mt-2 pt-2 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
-                                    <input 
-                                        type="text" 
-                                        placeholder="Add Item..." 
-                                        value={newItemNames[catName] || ''}
-                                        onChange={(e) => setNewItemNames(prev => ({ ...prev, [catName]: e.target.value }))}
-                                        className="flex-grow px-3 py-1.5 text-sm bg-surface-container dark:bg-surface-dark-container rounded-lg outline-none focus:ring-1 focus:ring-primary dark:focus:ring-primary-dark"
-                                        onKeyDown={(e) => e.key === 'Enter' && handleAddItem(catName)}
-                                    />
+                                {/* Category Actions */}
+                                <div className="flex items-center gap-1">
                                     <button 
-                                        onClick={() => handleAddItem(catName)}
-                                        disabled={!newItemNames[catName]?.trim()}
-                                        className="px-3 py-1.5 bg-secondary-container dark:bg-secondary-container-dark text-secondary-on-container dark:text-secondary-on-container-dark rounded-lg text-xs font-bold disabled:opacity-50"
+                                        onClick={() => moveCategory(catIndex, 'up')}
+                                        disabled={catIndex === 0}
+                                        className="p-1.5 text-surface-on-variant/50 hover:text-primary disabled:opacity-20"
                                     >
-                                        Add
+                                        <ArrowUpIcon className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                        onClick={() => moveCategory(catIndex, 'down')}
+                                        disabled={catIndex === categoryKeys.length - 1}
+                                        className="p-1.5 text-surface-on-variant/50 hover:text-primary disabled:opacity-20"
+                                    >
+                                        <ArrowDownIcon className="w-4 h-4" />
+                                    </button>
+                                    <div className="w-px h-4 bg-surface-outline/20 mx-1"></div>
+                                    <button onClick={() => setDeleteConfirmation({ type: 'category', catName })} className="p-1.5 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark transition-colors">
+                                        <TrashIcon className="w-4 h-4" />
                                     </button>
                                 </div>
-                                
-                                {/* Category Settings */}
-                                <div className="mt-3 pt-2 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={billFlags.includes(catName)} 
-                                            onChange={() => toggleBillUpload(catName)}
-                                            className="w-4 h-4 rounded text-primary dark:text-primary-dark focus:ring-primary dark:focus:ring-primary-dark bg-transparent border-surface-outline/30"
-                                        />
-                                        <span className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark">Allow Bill Photo Uploads</span>
-                                    </label>
-                                </div>
                             </div>
-                        )}
-                    </div>
-                ))}
+
+                            {openCategories.includes(catName) && (
+                                <div className="px-3 pb-3 space-y-2">
+                                    {/* Items List */}
+                                    {internalStructure[catName].map((item, itemIndex) => {
+                                        const isItemDragging = dragItem?.type === 'item' && dragItem.catName === catName && dragItem.index === itemIndex;
+                                        const isItemDragOver = dragOverInfo?.type === 'item' && dragOverInfo.catName === catName && dragOverInfo.index === itemIndex;
+
+                                        return (
+                                            <div 
+                                                key={item.name} 
+                                                data-item-row
+                                                onDragOver={(e) => handleDragOverItem(e, catName, itemIndex)}
+                                                onDrop={(e) => handleDropItem(e, catName, itemIndex)}
+                                                className={`grid grid-cols-[auto_1fr_auto_auto] items-center p-2 gap-x-2 rounded bg-surface-container dark:bg-surface-dark-container transition-all ${
+                                                    isItemDragOver ? 'ring-2 ring-primary/30 dark:ring-primary-dark/30 scale-[0.98]' : ''
+                                                } ${isItemDragging ? 'opacity-30' : ''}`}
+                                            >
+                                                {/* Drag Handle Item */}
+                                                <div 
+                                                    draggable
+                                                    onDragStart={(e) => handleDragStartItem(e, catName, itemIndex)}
+                                                    onDragEnd={handleDragEndItem}
+                                                    className="cursor-grab active:cursor-grabbing text-surface-on-variant/30 dark:text-surface-on-variant-dark/30 hover:text-surface-on dark:hover:text-surface-on-dark row-span-2 self-center p-1"
+                                                >
+                                                    <DragHandleIcon className="w-4 h-4" />
+                                                </div>
+
+                                                <span className="text-surface-on dark:text-surface-on-dark font-medium break-words leading-tight">{item.name}</span>
+                                                
+                                                {/* Item Move Arrows */}
+                                                <div className="flex flex-col gap-0.5 row-span-2">
+                                                    <button 
+                                                        onClick={() => moveItem(catName, itemIndex, 'up')}
+                                                        disabled={itemIndex === 0}
+                                                        className="p-0.5 text-surface-on-variant/40 hover:text-primary disabled:opacity-10"
+                                                    >
+                                                        <ArrowUpIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => moveItem(catName, itemIndex, 'down')}
+                                                        disabled={itemIndex === internalStructure[catName].length - 1}
+                                                        className="p-0.5 text-surface-on-variant/40 hover:text-primary disabled:opacity-10"
+                                                    >
+                                                        <ArrowDownIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+
+                                                <button onClick={() => setDeleteConfirmation({ type: 'item', catName, itemName: item.name })} className="p-1 text-surface-on-variant dark:text-surface-on-variant-dark hover:text-error dark:hover:text-error-dark row-span-2" aria-label="Delete item">
+                                                    <TrashIcon className="w-4 h-4"/>
+                                                </button>
+
+                                                <div className="relative col-span-2 col-start-2 mt-1">
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="Default Amount"
+                                                        value={item.defaultValue || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value);
+                                                            setInternalStructure(prev => ({
+                                                                ...prev,
+                                                                [catName]: prev[catName].map(i => i.name === item.name ? { ...i, defaultValue: isNaN(val) ? 0 : val } : i)
+                                                            }));
+                                                        }}
+                                                        className="w-full text-xs p-1.5 bg-transparent border-b border-surface-outline/20 dark:border-surface-outline-dark/20 focus:border-primary dark:focus:border-primary-dark outline-none text-surface-on-variant dark:text-surface-on-variant-dark"
+                                                    />
+                                                    <span className="absolute right-0 top-1.5 text-[10px] text-surface-on-variant/50">Default</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Add Item Input */}
+                                    <div className="flex gap-2 mt-2 pt-2 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Add Item..." 
+                                            value={newItemNames[catName] || ''}
+                                            onChange={(e) => setNewItemNames(prev => ({ ...prev, [catName]: e.target.value }))}
+                                            className="flex-grow px-3 py-1.5 text-sm bg-surface-container dark:bg-surface-dark-container rounded-lg outline-none focus:ring-1 focus:ring-primary dark:focus:ring-primary-dark"
+                                            onKeyDown={(e) => e.key === 'Enter' && handleAddItem(catName)}
+                                        />
+                                        <button 
+                                            onClick={() => handleAddItem(catName)}
+                                            disabled={!newItemNames[catName]?.trim()}
+                                            className="px-3 py-1.5 bg-secondary-container dark:bg-secondary-container-dark text-secondary-on-container dark:text-secondary-on-container-dark rounded-lg text-xs font-bold disabled:opacity-50"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Category Settings */}
+                                    <div className="mt-3 pt-2 border-t border-surface-outline/10 dark:border-surface-outline-dark/10">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={billFlags.includes(catName)} 
+                                                onChange={() => toggleBillUpload(catName)}
+                                                className="w-4 h-4 rounded text-primary dark:text-primary-dark focus:ring-primary dark:focus:ring-primary-dark bg-transparent border-surface-outline/30"
+                                            />
+                                            <span className="text-xs font-medium text-surface-on-variant dark:text-surface-on-variant-dark">Allow Bill Photo Uploads</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Save Button */}
