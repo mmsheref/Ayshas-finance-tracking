@@ -49,7 +49,10 @@ const RecordDetail: React.FC = () => {
         const base64Image = canvas.toDataURL('image/png');
         const fileName = `report_${record.date}.png`;
         const title = `P&L Report - ${record.date}`;
-        const text = `Here is the Profit & Loss report for ${record.date}.`;
+        
+        const formattedDate = new Date(record.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const profitText = profit >= 0 ? `Profit: ₹${profit.toLocaleString('en-IN')}` : `Loss: ₹${Math.abs(profit).toLocaleString('en-IN')}`;
+        const text = `P&L Report for ${formattedDate}. ${profitText}`;
         
         await shareImageFile(fileName, base64Image, title, text);
     } catch (error) {
